@@ -1,0 +1,63 @@
+Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)
+
+Copyright (c) 2026 Capsicum (@Capsicum0907) and RosettaUnit contributors
+
+This work is licensed under the Creative Commons Attribution-ShareAlike 4.0
+International License. To view a copy of this license, visit:
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042,
+USA.
+
+================================================================================
+
+SUMMARY (not a substitute for the license)
+
+You are free to:
+
+  - Share — copy and redistribute the material in any medium or format
+  - Adapt — remix, transform, and build upon the material for any purpose,
+    even commercially
+
+Under the following terms:
+
+  - Attribution — You must give appropriate credit, provide a link to the
+    license, and indicate if changes were made. You may do so in any
+    reasonable manner, but not in any way that suggests the licensor endorses
+    you or your use.
+
+  - ShareAlike — If you remix, transform, or build upon the material, you
+    must distribute your contributions under the same license as the
+    original.
+
+  - No additional restrictions — You may not apply legal terms or
+    technological measures that legally restrict others from doing anything
+    the license permits.
+
+================================================================================
+
+SCOPE WITHIN THIS REPOSITORY
+
+This license (CC BY-SA 4.0) applies to data and content files in this
+repository, including but not limited to:
+
+  - Files under `locales/` (translation data)
+  - Files under `rules/` (language rule definitions, when present)
+  - Files under `docs/` (documentation prose)
+
+Source code in this repository (under `src/`, `include/`, `bindings/`,
+`tests/`, build scripts, etc.) is licensed separately under the MIT License.
+See LICENSE-MIT for the full text and README.md for the boundary between the
+two licenses.
+
+================================================================================
+
+FULL LICENSE TEXT
+
+The complete legal text of CC BY-SA 4.0 is available at:
+
+    https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+By contributing data or content to this repository, you agree that your
+contributions will be licensed under CC BY-SA 4.0.

@@ -1,0 +1,8 @@
+My Application v1.0
+
+A small example program demonstrating how RosettaUnit handles long-form
+text via external file references. UI labels stay in the JSON file where
+they're easy to scan; multi-paragraph documents like this one live in
+their own files where translators can edit them with normal text tools.
+
+Copyright (c) 2026. All rights reserved.

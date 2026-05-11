@@ -1,0 +1,11 @@
+{
+  "app.title": "My Application",
+  "greeting": "Hello, {name}!",
+  "menu.file": "File",
+  "menu.edit": "Edit",
+  "menu.help": "Help",
+  "dialog.confirm_exit": "Are you sure you want to quit?",
+  "status.saved": "Saved {count} item(s).",
+
+  "about.text": { "$file": "en/about.txt" }
+}
