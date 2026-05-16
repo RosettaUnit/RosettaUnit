@@ -1,11 +1,11 @@
 {
   "app.title": "マイアプリケーション",
-  "greeting": "こんにちは、{name}さん!",
+  "greeting": "こんにちは、${name}さん!",
   "menu.file": "ファイル",
   "menu.edit": "編集",
   "menu.help": "ヘルプ",
   "dialog.confirm_exit": "本当に終了しますか?",
-  "status.saved": "{count} 件保存しました。",
+  "status.saved": "${count} 件保存しました。",
 
   "about.text": { "$file": "ja/about.txt" }
 }

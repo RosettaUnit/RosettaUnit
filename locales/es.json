@@ -1,6 +1,6 @@
 {
   "app.title": "Mi Aplicación",
-  "greeting": "¡Hola, {name}!",
+  "greeting": "¡Hola, ${name}!",
   "menu.file": "Archivo",
   "menu.edit": "Editar"
 }
