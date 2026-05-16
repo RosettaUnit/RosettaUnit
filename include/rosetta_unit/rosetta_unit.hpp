@@ -1,4 +1,4 @@
-// RosettaUnit - Lightweight i18n library for C++
+// RosettaUnit - Lightweight i18n library for C++ and beyond
 // https://github.com/RosettaUnit/RosettaUnit
 //
 // Usage:
@@ -19,7 +19,28 @@
 
 namespace rosetta {
 
-// Replacement map for placeholders like {name}
+// ----------------------------------------------------------------------
+// Marker strings emitted when template interpolation or file loading
+// encounters an anomaly.
+//
+// These are part of the public API so callers can detect and react to
+// problems (e.g. a locale validator scanning translated output, a logging
+// hook, an integration test asserting no markers appear in shipped UI).
+//
+// All markers are wrapped in `[...]` and start with a category keyword.
+// `kUnclosed` is emitted as-is (a complete marker). The other three are
+// prefixes; the variable content (identifier name or file path) follows,
+// terminated by `]`.
+// ----------------------------------------------------------------------
+namespace markers {
+    inline constexpr const char* kUnclosed        = "[unclosed]";
+    inline constexpr const char* kInvalidPrefix   = "[invalid: ";
+    inline constexpr const char* kUndefinedPrefix = "[undefined: ";
+    inline constexpr const char* kMissingPrefix   = "[missing: ";
+    inline constexpr char        kMarkerClose     = ']';
+}
+
+// Replacement map for placeholders like ${name}
 using Params = std::unordered_map<std::string, std::string>;
 
 // Callback signature for missing-key reporting (optional)
@@ -66,9 +87,18 @@ public:
 
     // ---- Translation ------------------------------------------------------
 
-    // Look up `key` in the active language. Substitutes {placeholder}
+    // Look up `key` in the active language. Substitutes ${placeholder}
     // occurrences with values from `params`. Falls back to the fallback
     // language and finally to `key` itself if nothing matches.
+    //
+    // Template syntax (v0.2.0+, JS template literal compatible):
+    //   ${name}           — substituted with params["name"]
+    //   ${ name }         — whitespace around the name is trimmed
+    //   $                 — literal unless followed by `{`
+    //   {  }              — both braces are literal
+    //
+    // Anomalies surface as visible `[...]` markers; see namespace markers
+    // above.
     std::string tr(const std::string& key) const;
     std::string tr(const std::string& key, const Params& params) const;
 

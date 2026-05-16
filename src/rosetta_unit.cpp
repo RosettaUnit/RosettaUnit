@@ -209,34 +209,112 @@ private:
     }
 };
 
-// Replace {name} occurrences using params. Unknown placeholders are left as-is
-// so missing values are visible during development rather than silently empty.
+// ---------------------------------------------------------------------------
+// Template interpolation (v0.2.0+, JS template literal compatible)
+// ---------------------------------------------------------------------------
+
+// ASCII whitespace check. Avoids std::isspace's locale dependency.
+// Unicode whitespace (e.g. U+00A0, U+3000) is intentionally not stripped —
+// this is a pragmatic simplification. Translators are not expected to
+// embed such characters around identifiers.
+inline bool is_ascii_ws(char c) {
+    return c == ' ' || c == '\t' || c == '\n'
+        || c == '\r' || c == '\f' || c == '\v';
+}
+
+// Identifier character classes for `${name}` syntax.
+inline bool is_ident_start(char c) {
+    return (c >= 'A' && c <= 'Z')
+        || (c >= 'a' && c <= 'z')
+        || c == '_';
+}
+inline bool is_ident_cont(char c) {
+    return is_ident_start(c) || (c >= '0' && c <= '9');
+}
+
+// Validate that `s` matches the identifier grammar [A-Za-z_][A-Za-z0-9_]*.
+// Empty strings return false.
+bool is_valid_identifier(const std::string& s) {
+    if (s.empty()) return false;
+    if (!is_ident_start(s[0])) return false;
+    for (std::size_t i = 1; i < s.size(); ++i) {
+        if (!is_ident_cont(s[i])) return false;
+    }
+    return true;
+}
+
+// Substitute `${name}` placeholders in `tmpl` with values from `params`.
+//
+// Grammar (see Issue #1 for the full spec):
+//   template      ::= ( placeholder | invalid_brace | literal_run )*
+//   placeholder   ::= "${" ws* identifier ws* "}"
+//   identifier    ::= [A-Za-z_] [A-Za-z0-9_]*
+//   ws            ::= ASCII whitespace (space, tab, \n, \r, \f, \v)
+//
+// Anomalies are emitted as visible `[...]` markers rather than silently
+// swallowed: `[unclosed]`, `[invalid: <body>]`, `[undefined: <name>]`.
+// Healthy placeholders in the same template still substitute normally.
 std::string interpolate(const std::string& tmpl, const Params& params) {
-    if (params.empty() || tmpl.find('{') == std::string::npos) return tmpl;
+    // Fast path: no `${` sequence anywhere means no work to do.
+    if (tmpl.find("${") == std::string::npos) return tmpl;
+
     std::string out;
     out.reserve(tmpl.size());
-    for (std::size_t i = 0; i < tmpl.size(); ++i) {
-        // Allow `{{` to escape a literal '{'.
-        if (tmpl[i] == '{' && i + 1 < tmpl.size() && tmpl[i + 1] == '{') {
-            out += '{';
+
+    std::size_t i = 0;
+    while (i < tmpl.size()) {
+        // Look for the start of a placeholder: `$` followed by `{`.
+        // A lone `$` (not followed by `{`) is emitted literally.
+        if (tmpl[i] != '$' || i + 1 >= tmpl.size() || tmpl[i + 1] != '{') {
+            out += tmpl[i];
             ++i;
             continue;
         }
-        if (tmpl[i] == '{') {
-            auto end = tmpl.find('}', i + 1);
-            if (end == std::string::npos) { out += tmpl[i]; continue; }
-            std::string name = tmpl.substr(i + 1, end - i - 1);
-            auto it = params.find(name);
+
+        // Found `${`. Scan forward for the matching `}`.
+        std::size_t close = tmpl.find('}', i + 2);
+        if (close == std::string::npos) {
+            // Unclosed: emit marker, skip past the `${`, continue.
+            // We do NOT consume the rest of the template — subsequent
+            // characters might form valid placeholders on their own.
+            out += markers::kUnclosed;
+            i += 2;
+            continue;
+        }
+
+        // Extract the body between `${` and `}` (exclusive on both ends).
+        std::string body = tmpl.substr(i + 2, close - i - 2);
+
+        // Trim leading and trailing ASCII whitespace.
+        std::size_t start = 0;
+        while (start < body.size() && is_ascii_ws(body[start])) ++start;
+        std::size_t end = body.size();
+        while (end > start && is_ascii_ws(body[end - 1])) --end;
+        std::string trimmed = body.substr(start, end - start);
+
+        if (!is_valid_identifier(trimmed)) {
+            // Body is empty, has internal whitespace, or doesn't match
+            // identifier rules. Emit `[invalid: <body>]` with the body
+            // shown as-it-was-written (untrimmed) so the translator sees
+            // exactly what they typed.
+            out += markers::kInvalidPrefix;
+            out += body;
+            out += markers::kMarkerClose;
+        } else {
+            // Valid identifier — look it up in params.
+            auto it = params.find(trimmed);
             if (it != params.end()) {
                 out += it->second;
             } else {
-                out.append(tmpl, i, end - i + 1); // leave placeholder visible
+                out += markers::kUndefinedPrefix;
+                out += trimmed;
+                out += markers::kMarkerClose;
             }
-            i = end;
-        } else {
-            out += tmpl[i];
         }
+
+        i = close + 1;
     }
+
     return out;
 }
 
@@ -309,7 +387,8 @@ static void resolve_file_refs(std::unordered_map<std::string, std::string>& map,
         } else {
             std::cerr << "[RosettaUnit] missing referenced file: "
                       << ref.string() << " (key=" << kv.first << ")\n";
-            v = "[missing: " + ref.string() + "]";
+            v = std::string(markers::kMissingPrefix) + ref.string()
+                + markers::kMarkerClose;
         }
     }
 }
