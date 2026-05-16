@@ -8,8 +8,21 @@ The name is from the Rosetta Stone — one engine, many languages, both for
 the *applications* using it and for the *programming languages* that can
 call it.
 
-> **Status:** v0.1.0 — initial implementation complete, all tests passing.
-> API is not yet frozen. Breaking changes possible until v1.0.
+> **Status:** v0.2.0 — JS-template-literal-compatible `${name}` syntax,
+> with a visible-marker family for anomaly diagnostics.
+
+## Stability
+
+RosettaUnit is in `0.x.y` development. The public API, configuration
+format, and on-disk file format are all subject to breaking changes
+between minor versions until `1.0.0` is released. Production use is
+discouraged until then; please pin to an exact version and read the
+changelog before upgrading.
+
+This is not a warning against early adoption — early users are welcome,
+and their feedback shapes the design — it is an honest statement of
+expectations so no one is surprised when a `v0.x.y` → `v0.(x+1).0` bump
+breaks their build.
 
 ---
 
@@ -26,9 +39,11 @@ RosettaUnit aims at a third path:
 
 - **The library knows nothing.** It does not parse BCP 47, does not bundle
   CLDR, does not assume what counts as "a language."
-- **Knowledge lives in data files.** Translation strings, plural rules
-  (coming in v0.2), and any language-specific logic are JSON files that
-  non-programmers can edit and submit as pull requests.
+- **Knowledge lives in data files and code contributed by speakers.**
+  Translation strings are JSON files that non-programmers can edit and
+  submit as pull requests. Language-specific selection rules (plurals,
+  gender, formality) are programmatic and registered by anyone who knows
+  the language — see the [plural rule discussion](https://github.com/RosettaUnit/RosettaUnit/issues/3).
 - **Dialects, conlangs, period languages, and fictional tongues are
   first-class citizens.** `"ja"`, `"osaka-ben"`, `"elvish"`, and
   `"classical-japanese"` are all just keys in a dictionary as far as the
@@ -44,7 +59,10 @@ community-maintained language rules that you can pull in when you need them.
 
 - Single-header public C++ API, PIMPL'd so ABI is stable
 - JSON translation files, flat or nested (nested keys flatten with dots)
-- `{placeholder}` interpolation, with `{{` to escape a literal `{`
+- `${placeholder}` interpolation, JS template literal compatible
+- Visible-marker diagnostics: anomalies in translations surface as
+  `[unclosed]` / `[invalid: ...]` / `[undefined: ...]` / `[missing: ...]`
+  rather than silent failures
 - Fallback language for partial translations
 - Missing-key handler for development-time diagnostics
 - C ABI for cross-language bindings
@@ -86,7 +104,7 @@ print(t.tr("greeting", name="Alice"))
 ```json
 {
   "app.title": "マイアプリケーション",
-  "greeting": "こんにちは、{name}さん!",
+  "greeting": "こんにちは、${name}さん!",
   "menu": {
     "file": "ファイル",
     "edit": "編集"
@@ -111,7 +129,7 @@ and diffs are noisy. So RosettaUnit also supports **file references**:
 ```
 
 The referenced file's entire contents become the translation value.
-Placeholder substitution (`{name}` etc.) still works on the loaded text.
+Placeholder substitution (`${name}` etc.) still works on the loaded text.
 Paths are resolved relative to the JSON file's own directory.
 
 Pick whichever style fits each piece of content. A typical layout:
@@ -131,6 +149,68 @@ locales/
 The filename stem (`ja`, `en`, `pt-BR`, ...) is the language code. Use
 whatever convention you like — RosettaUnit doesn't validate against
 ISO 639 etc., it just matches the strings you pass to `set_language`.
+
+## Template syntax
+
+Translation strings use a small `${name}` placeholder syntax, compatible
+with JavaScript template literals. The full design discussion lives in
+[Issue #1](https://github.com/RosettaUnit/RosettaUnit/issues/1); this
+section covers the day-to-day surface for translators and integrators.
+
+### Placeholders
+
+```
+${name}        → looked up in params, substituted as-is
+${ name }      → same; whitespace inside the braces is trimmed
+$              → literal unless followed by `{`
+{  }           → both braces are literal; no escape needed
+```
+
+Identifier names must match `[A-Za-z_][A-Za-z0-9_]*`. Whitespace is
+ASCII-only (space, tab, `\n`, `\r`, `\f`, `\v`); Unicode whitespace such
+as U+00A0 or U+3000 is not stripped.
+
+There is no `$$` escape and no `${...}` escape: a lone `$` followed by
+anything other than `{` is already literal, and braces themselves are
+already literal. JSON, HTML, code samples, and math notation can be
+written as-is (subject to JSON's own string escaping):
+
+```json
+{
+  "greeting":      "Hello, ${name}!",
+  "json_example":  "Send {\"key\": \"value\"} to the endpoint",
+  "math_example":  "The set {1, 2, 3} has ${count} elements",
+  "price":         "Today's special: $${price_usd}",
+  "windows_path":  "Save location: C:\\Users\\${user}\\Documents"
+}
+```
+
+### Visible-marker diagnostics
+
+When a translation has a problem, RosettaUnit emits a visible marker
+in-place rather than failing silently. There are four:
+
+| Marker                | Meaning                                                              | Triggered by                                          |
+| --------------------- | -------------------------------------------------------------------- | ----------------------------------------------------- |
+| `[unclosed]`          | A `${` was opened but never closed before end-of-template            | `"foo ${bar"`                                         |
+| `[invalid: <body>]`   | `${...}` body, after whitespace trim, doesn't match identifier rules | `${1foo}`, `${name extra}`, `${}`                     |
+| `[undefined: <name>]` | Identifier is valid, but no value in `params` and no fallback        | `${user}` when `params` has no `user`                 |
+| `[missing: <path>]`   | `$file` reference target couldn't be opened                          | `{"k": {"$file": "missing.txt"}}`                     |
+
+A reader seeing `[...]` in the UI immediately knows the locale data is
+the problem, not the code. Multiple anomalies in the same template are
+handled independently — healthy placeholders still substitute normally:
+
+```
+template:  "Hi ${name}, order ${1order} is ${unclosed"
+params:    { name: "Alice" }
+
+output:    "Hi Alice, order [invalid: 1order] is [unclosed]unclosed"
+```
+
+The marker strings are also exposed as constants in the
+`rosetta::markers` namespace, so callers can build locale validators or
+logging hooks that detect them programmatically.
 
 ## Building
 
@@ -154,8 +234,10 @@ Any language with FFI can talk to the C ABI declared in
 
 ## What's not (yet) included
 
-- Pluralization (CLDR rules). Planned for v0.2 as a rule-definition
-  mechanism — see the Roadmap below.
+- Pluralization. The design direction — rules as code, not data — is
+  under discussion in
+  [Issue #3](https://github.com/RosettaUnit/RosettaUnit/issues/3),
+  targeted for v0.3.0 at the earliest.
 - Right-to-left helpers — the library just returns strings, your UI layer
   handles direction.
 - A GUI tool for editing translation files. JSON in any editor works fine.
@@ -196,9 +278,13 @@ translation data, which don't require any C++ knowledge. See
 See the [issue tracker](https://github.com/RosettaUnit/RosettaUnit/issues)
 and milestones. Highlights for upcoming versions:
 
-- **v0.2** — Rule-definition mechanism for plurals, gender, and other
-  language-specific selection. Companion
+- **v0.2.0** (current) — JS-template-literal-compatible `${name}` syntax;
+  visible-marker family for anomaly diagnostics; public `rosetta::markers`
+  namespace.
+- **v0.3.0** — Pluralization helpers (rules as code; see Issue #3 for the
+  open design discussion). Companion
   [`RosettaUnit-locale`](https://github.com/RosettaUnit/RosettaUnit-locale)
   module with built-in rules for major languages.
-- **v0.3+** — Additional language bindings, CMake packaging, performance
-  work as needed.
+- **Beyond v0.3** — Additional language bindings, CMake packaging,
+  performance work as needed, documentation improvements (see Issue #2
+  for `$file` semantics and thread safety docs already queued).
