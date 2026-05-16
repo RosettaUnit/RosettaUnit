@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(RosettaUnit
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Lightweight i18n library for C++ and beyond"
     LANGUAGES CXX
 )
